@@ -41,18 +41,24 @@ module type Vec3 = sig
   (** [map f v] is the component wise application of [f] to [v]. *)
 end
 
-module type Octree = sig
+module type Octree =
+sig
   type vec3
   type t = Leaf of vec3 | Node of node
   and node = { children : t option array; level : int; offset : vec3; }
-  type root = { max_depth : int; size: float; origin: vec3;tree : node; }
-  val max_depth : int
-  val empty : int -> root
+  type root = {
+    max_depth : int;
+    size : float;
+    origin : vec3;
+    tree : node;
+  }
+  val empty : ?size:float -> ?origin:vec3 -> int -> root
   val add : root -> vec3 -> unit
-  val of_list : int -> vec3 list -> root
-  val of_seq : int -> vec3 Seq.t -> root
+  val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> root
+  val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> root
   val leaves : node -> vec3 list
-  val nearest : node -> vec3 -> vec3
+  val tree_nearest : float -> vec3 -> node -> vec3 -> vec3
+  val nearest : root -> vec3 -> vec3
 end
 
 (*
