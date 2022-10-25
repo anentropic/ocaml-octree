@@ -1,0 +1,27 @@
+(lang dune 3.5)
+(name oktree)
+(version 0.1.0)
+
+(generate_opam_files true)
+
+(source (github anentropic/ocaml-oktree))
+(license MIT)
+(authors "Anentropic")
+(maintainers "ego@anentropic.com")
+
+(package
+ (name oktree)
+ (synopsis "OKtree: A simple octree implementation in OCaml")
+ (description "A simple octree implementation in OCaml, intended to efficiently find nearest match for an arbitrary point among a set of points in 3D coordinate space.")
+ (depends
+  (ocaml (>= 4.10))
+  (psq (>= 0.2))
+  ; test deps
+  (alcotest (and :with-test (>= 1.4)))
+  (junit_alcotest (and :with-test (>= 2.0)))
+  (gg (and :with-test (>= 1.0)))
+  ; dev deps (to be installed manually)
+  ; - ocaml-lsp-server
+  ; - ocp-indent
+  ; - ocamlformat
+ ))

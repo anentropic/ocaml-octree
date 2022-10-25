@@ -1,0 +1,4 @@
+(library
+ (name oktree)
+ (public_name oktree)
+ (libraries psq))
