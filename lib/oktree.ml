@@ -39,6 +39,9 @@ module type Vec3 = sig
 
   val map : (float -> float) -> t -> t
   (** [map f v] is the component wise application of [f] to [v]. *)
+
+  val pp : Format.formatter -> t -> unit
+  (** [pp ppf v] prints a textual representation of [v] on [ppf]. *)
 end
 
 module type Octree =
@@ -52,6 +55,9 @@ sig
     origin : vec3;
     tree : node;
   }
+  val pp : Format.formatter -> t -> unit
+  val pp_node : Format.formatter -> node -> unit
+  val pp_root : Format.formatter -> root -> unit
   val empty : ?size:float -> ?origin:vec3 -> int -> root
   val add : root -> vec3 -> unit
   val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> root
@@ -59,6 +65,7 @@ sig
   val leaves : node -> vec3 list
   val tree_nearest : float -> vec3 -> node -> vec3 -> vec3
   val nearest : root -> vec3 -> vec3
+  val distances : root -> vec3 -> (vec3 * float) list
 end
 
 (*
@@ -76,10 +83,29 @@ end
 
   Could we supply an alternative distance function?
   https://machinelearningmastery.com/distance-measures-for-machine-learning
+
+  TODO: what if there are multiple equidistant matches? currently we just
+  return the first leaf that wins the priority queue - psq will compare
+  item values where their priority is equal, so we could tweak this to be
+  deterministic (e.g. favour darkest or brightest value) or keep popping
+  all the equal priorities and return a set?
+
+  TODO: points should be unique currently no validation for duplicates
+  (or return them all as above)
+  TODO!: currently points which share same leaf octant will overwrite each
+  other when added... presumably type should be [Leaf of vec3] ?
+  https://geidav.wordpress.com/2014/08/18/advanced-octrees-2-node-representations/
+  appears to show nodes storing children (other nodes) separately from
+  values, i.e. leaf is a bucket
+
+  TODO: question - would it be in any way more efficient/better to store the
+  tree as a 2D array on root instead of nested array-in-a-record-field ?
 *)
 module Make = functor (V3 : Vec3) ->
 struct
   type vec3 = V3.t
+
+  let pp_vec3 = V3.pp
 
   type t =
     | Leaf of vec3
@@ -88,25 +114,26 @@ struct
     children: t option array;
     level: int;
     offset: vec3;
-    (*
-      octant  index  bits
-      x0_y0_z0: 0 | 0 0 0
-      x0_y0_z1: 1 | 0 0 1
-      x0_y1_z0: 2 | 0 1 0
-      x0_y1_z1: 3 | 0 1 1
-      x1_y0_z0: 4 | 1 0 0
-      x1_y0_z1: 5 | 1 0 1
-      x1_y1_z0: 6 | 1 1 0
-      x1_y1_z1: 7 | 1 1 1
-    *)
-  }
+  } [@@deriving show]
+
+  (*
+    octant  index  bits
+    x0_y0_z0: 0 | 0 0 0
+    x0_y0_z1: 1 | 0 0 1
+    x0_y1_z0: 2 | 0 1 0
+    x0_y1_z1: 3 | 0 1 1
+    x1_y0_z0: 4 | 1 0 0
+    x1_y0_z1: 5 | 1 0 1
+    x1_y1_z0: 6 | 1 1 0
+    x1_y1_z1: 7 | 1 1 1
+  *)
 
   type root = {
     max_depth: int;
     size: float;
     origin: vec3;
     tree: node;
-  }
+  } [@@deriving show]
 
   let default_origin = V3.of_tuple (0., 0., 0.)
   let default_size = 1.
@@ -236,6 +263,9 @@ struct
       scale by 2*2=4 times
       octant 000 grows to cover 0,0,0...2,2,2
       offset by -1,-1,-1
+
+      TODO: scaled octant offsets could be pre-calculated, the scalings
+      are different for each octant but they are static
     *)
     let level' = Float.of_int octant.level in
     let p_to_normalised octant p =
@@ -331,5 +361,8 @@ struct
 
   let nearest root p =
     tree_nearest root.size root.origin root.tree p
+
+  let distances root p =
+    List.map (fun p' -> (p', distance p p')) (leaves root.tree)
 
 end

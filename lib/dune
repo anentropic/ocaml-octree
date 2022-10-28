@@ -1,4 +1,6 @@
 (library
  (name oktree)
  (public_name oktree)
+ (preprocess
+  (pps ppx_deriving.show))
  (libraries psq))

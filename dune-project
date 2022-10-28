@@ -17,11 +17,11 @@
   (ocaml (>= 4.10))
   (psq (>= 0.2))
   ; test deps
-  (alcotest (and :with-test (>= 1.4)))
-  (junit_alcotest (and :with-test (>= 2.0)))
+  (ppx_deriving_popper (and :with-test (>= 0.1.1)))
   (gg (and :with-test (>= 1.0)))
   ; dev deps (to be installed manually)
   ; - ocaml-lsp-server
   ; - ocp-indent
   ; - ocamlformat
+  ; - utop
  ))

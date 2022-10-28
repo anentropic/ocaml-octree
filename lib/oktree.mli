@@ -12,6 +12,7 @@ sig
   val div : t -> t -> t
   val norm : t -> float
   val map : (float -> float) -> t -> t
+  val pp : Format.formatter -> t -> unit
 end
 
 module type Octree =
@@ -25,6 +26,9 @@ sig
     origin : vec3;
     tree : node;
   }
+  val pp : Format.formatter -> t -> unit
+  val pp_node : Format.formatter -> node -> unit
+  val pp_root : Format.formatter -> root -> unit
   val empty : ?size:float -> ?origin:vec3 -> int -> root
   val add : root -> vec3 -> unit
   val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> root
@@ -32,6 +36,7 @@ sig
   val leaves : node -> vec3 list
   val tree_nearest : float -> vec3 -> node -> vec3 -> vec3
   val nearest : root -> vec3 -> vec3
+  val distances : root -> vec3 -> (vec3 * float) list
 end
 
 module Make :
