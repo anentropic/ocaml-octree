@@ -42,30 +42,39 @@ module type Vec3 = sig
 
   val pp : Format.formatter -> t -> unit
   (** [pp ppf v] prints a textual representation of [v] on [ppf]. *)
+
+  val compare : t -> t -> int
+  (** [compare u v] is [Stdlib.compare u v]. *)
 end
 
-module type Octree =
+module type M =
 sig
   type vec3
-  type t = Leaf of vec3 | Node of node
-  and node = { children : t option array; level : int; offset : vec3; }
-  type root = {
+  type t = {
     max_depth : int;
     size : float;
     origin : vec3;
-    tree : node;
-  }
+    root : node;
+  } and
+  node = {
+    mutable children: children;
+    level: int;
+    offset: vec3;
+  } and
+  children =
+      | Nodes of node option array
+      | Points of vec3 list
   val pp : Format.formatter -> t -> unit
   val pp_node : Format.formatter -> node -> unit
-  val pp_root : Format.formatter -> root -> unit
-  val empty : ?size:float -> ?origin:vec3 -> int -> root
-  val add : root -> vec3 -> unit
-  val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> root
-  val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> root
+  val pp_children : Format.formatter -> children -> unit
+  val empty : ?size:float -> ?origin:vec3 -> int -> t
+  val add : t -> vec3 -> unit
+  val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> t
+  val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> t
   val leaves : node -> vec3 list
-  val tree_nearest : float -> vec3 -> node -> vec3 -> vec3
-  val nearest : root -> vec3 -> vec3
-  val distances : root -> vec3 -> (vec3 * float) list
+  val node_nearest : float -> vec3 -> node -> vec3 -> vec3
+  val nearest : t -> vec3 -> vec3
+  val distances : t -> vec3 -> (vec3 * float) list
 end
 
 (*
@@ -90,13 +99,8 @@ end
   deterministic (e.g. favour darkest or brightest value) or keep popping
   all the equal priorities and return a set?
 
-  TODO: points should be unique currently no validation for duplicates
-  (or return them all as above)
-  TODO!: currently points which share same leaf octant will overwrite each
-  other when added... presumably type should be [Leaf of vec3] ?
-  https://geidav.wordpress.com/2014/08/18/advanced-octrees-2-node-representations/
-  appears to show nodes storing children (other nodes) separately from
-  values, i.e. leaf is a bucket
+  TODO: points should be unique? - currently no validation for duplicates
+  (we may return one or all depending on equidistant behaviour)
 
   TODO: question - would it be in any way more efficient/better to store the
   tree as a 2D array on root instead of nested array-in-a-record-field ?
@@ -107,16 +111,23 @@ struct
 
   let pp_vec3 = V3.pp
 
-  type t =
-    | Leaf of vec3
-    | Node of node
+  type t = {
+    max_depth: int;
+    size: float;
+    origin: vec3;
+    root: node;
+  }
   and node = {
-    children: t option array;
-    level: int;
+    mutable children: children;
+    level: int;  (* node levels start at 1 *)
     offset: vec3;
-  } [@@deriving show]
-
+  }
+  and children =
+    | Nodes of node option array
+    | Points of vec3 list 
+  [@@deriving show]
   (*
+  Nodes array structure:
     octant  index  bits
     x0_y0_z0: 0 | 0 0 0
     x0_y0_z1: 1 | 0 0 1
@@ -128,30 +139,33 @@ struct
     x1_y1_z1: 7 | 1 1 1
   *)
 
-  type root = {
-    max_depth: int;
-    size: float;
-    origin: vec3;
-    tree: node;
-  } [@@deriving show]
-
   let default_origin = V3.of_tuple (0., 0., 0.)
   let default_size = 1.
+
+  let empty_node_children () = Nodes (Array.make 8 None)
+  let empty_leaf_children () = Points []
+
+  let root_children = function
+    | d when d = 1 -> empty_leaf_children ()
+    | _ -> empty_node_children ()
 
   (* init an octree root *)
   let empty ?(size=default_size) ?(origin=default_origin) max_depth =
     match max_depth with
     | d when d < 1 -> raise @@ Invalid_argument "max_depth must be >= 1"
     | _ ->
+      let root =
+        {
+          children = root_children max_depth;
+          level = 1;
+          offset = V3.of_tuple (0., 0., 0.);
+        }
+      in
       {
         max_depth;
         origin;
         size;
-        tree = {
-          children = Array.make 8 None;
-          level = 1;
-          offset = V3.of_tuple (0., 0., 0.);
-        }
+        root;
       }
 
   let normalise_origin = V3.of_tuple (-1., -1., -1.)
@@ -192,58 +206,66 @@ struct
     V3.of_tuple ((offset V3.x 4), (offset V3.y 2), (offset V3.z 1))
 
   (* add a new leaf to the octree (updates root in place) *)
-  let add root p =
-    let rec construct tree p =
-      let index = octant_index_for_p tree p in
-      let get_or_make_node level =
-        (* if we're calling this there should be no leaves at this level *)
-        match Array.get tree.children index with
-        | Some (Node n) -> n
-        | Some (Leaf _) -> raise @@ Invalid_argument "Leaf not expected"
-        | None ->
-          let offset = octant_offset tree index in
-          {
-            children = Array.make 8 None;
-            level;
-            offset;
-          }
-      in
-      match tree.level with
-      | l when l < root.max_depth ->
-        let node = get_or_make_node (tree.level + 1) in
-        let constructed = construct node p in
-        Array.set tree.children index (Some (Node constructed));
-        tree
-      | _ ->
-        Array.set tree.children index (Some (Leaf p));
-        tree
+  let add tree p =
+    let rec construct parent p =
+      match parent.children with
+      | Nodes nodes ->
+        (* inner node *)
+        let level = parent.level + 1 in
+        let index = octant_index_for_p parent p in
+        let offset = octant_offset parent index in
+        let children =
+          match level with
+          | l when l < tree.max_depth -> empty_node_children ()
+          | _ -> empty_leaf_children ()
+        in
+        let node = begin
+          match Array.get nodes index with
+          | Some n -> n  (* target node already exists *)
+          | None ->
+            {
+              children;
+              level;
+              offset;
+            }
+        end
+        in
+        let node = construct node p in
+        Array.set nodes index (Some node);
+        parent
+      | Points points ->
+        (* leaf *)
+        parent.children <- Points (List.cons p points);
+        parent
     in
-    ignore @@ construct root.tree p
+    ignore @@ construct tree.root p
 
   let of_list ?(size=default_size) ?(origin=default_origin) max_depth l =
-    let root = empty ~size ~origin max_depth in
-    List.iter (add root) l;
-    root
+    let tree = empty ~size ~origin max_depth in
+    List.iter (add tree) l;
+    tree
 
   let of_seq ?(size=default_size) ?(origin=default_origin) max_depth s =
-    let root = empty ~size ~origin max_depth in
-    Seq.iter (add root) s;
-    root
+    let tree = empty ~size ~origin max_depth in
+    Seq.iter (add tree) s;
+    tree
 
   (*
     recursively collect the leaves below a given octant
     (I'm not sure this has much utility beyond debugging)
   *)
-  let leaves tree =
+  let leaves node =
     let rec collect leaves children =
-      Array.fold_left (fun leaves child ->
-          match child with
-          | Some (Leaf l) -> List.cons l leaves
-          | Some (Node n) -> collect leaves n.children
-          | None -> leaves
-        ) leaves children
+      match children with
+      | Nodes nodes ->
+        Array.fold_left (fun leaves child ->
+            match child with
+            | Some node -> collect leaves node.children
+            | None -> leaves
+          ) leaves nodes
+      | Points points -> List.append leaves points
     in
-    collect [] tree.children
+    collect [] node.children
 
   (* Euclidean distance. Always positive (i.e. has no direction) *)
   let distance a b = V3.sub a b |> V3.norm
@@ -312,33 +334,57 @@ struct
     (* denormalise, so we can compare octant distances with p2p distances *)
     d /. level' /. normalise_size
 
-  (* make a Priority Queue type for our nearest search *)
-  type _octree_t = t
+  type child =
+    | Node of node
+    | Point of vec3
+
+  (* make Priority Queue types for our nearest search *)
   module PQ_Item = struct
-    type t = _octree_t
-    let compare = compare
+    type t = child
+    let compare a b =
+      (* this will be used to distinguish equidistant items *)
+      match a, b with
+      | Node _, Node _ -> 0
+      | Node _, Point _ -> 1
+      | Point _, Node _ -> -1
+      | Point _, Point _ -> 0
+    let pp fmt item =
+      match item with
+      | Node node ->
+        Format.fprintf fmt "Node(level: %i, offset: %a)" node.level V3.pp node.offset
+      (* pp_node fmt node *)
+      | Point point -> V3.pp fmt point
   end
   module PQ_Priority = struct
     type t = float
     let compare = compare
+    let pp fmt = Format.fprintf fmt (format_of_string "%f")
   end
   module PQ = Psq.Make(PQ_Item)(PQ_Priority)
 
-  let tree_nearest root_size root_offset tree p =
-    let rec nearest' pq tree p =
+  let children_to_seq = function
+    | Nodes nodes ->
+      Array.to_seq nodes
+      |> Seq.filter_map (function
+          | Some node -> Some (Node node)
+          | None -> None
+        )
+    | Points points -> List.to_seq points |> Seq.map (fun el -> Point el)
+
+  (* TODO return option type instead of raise Not_found ? *)
+  let node_nearest root_size root_offset node p =
+    let rec nearest' pq children p =
       (* enqueue children of current octant *)
       let pq = PQ.add_seq (
-          Array.to_seq tree.children
-          |> Seq.filter_map Fun.id  (* omit Nones *)
-          |> Seq.map (fun child ->
+          Seq.map (fun child ->
               match child with
-              | Leaf l ->
-                let d = distance l p in
-                (child, d)
-              | Node n ->
-                let d = octant_min_distance root_size root_offset n p in
-                (child, d)
-            )
+              | Node node ->
+                let d = octant_min_distance root_size root_offset node p in
+                (Node node, d)
+              | Point p' -> 
+                let d = distance p p' in
+                (Point p', d)
+            ) children
         ) pq
       in
       (*
@@ -349,20 +395,21 @@ struct
         in the queue we will pop the node instead and explore that... meaning
         if we ever pop a leaf here it should be our best match
       *)
+      ignore @@ Format.printf "PQ: %a\n" (PQ.pp_dump PQ_Item.pp PQ_Priority.pp) pq;
       match PQ.pop pq with
-      | Some ((tree, _), pq) -> begin
-          match tree with
-          | Leaf l -> l
-          | Node n -> nearest' pq n p
+      | Some ((child, _), pq) -> begin
+          match child with
+          | Point p' -> p'
+          | Node node -> nearest' pq (children_to_seq node.children) p
         end
-      | None -> raise Not_found  (* would mean our tree is empty *)
+      | None -> raise Not_found  (* would mean our tree was empty *)
     in
-    nearest' PQ.empty tree p
+    nearest' PQ.empty (children_to_seq node.children) p
 
-  let nearest root p =
-    tree_nearest root.size root.origin root.tree p
+  let nearest tree p =
+    node_nearest tree.size tree.origin tree.root p
 
-  let distances root p =
-    List.map (fun p' -> (p', distance p p')) (leaves root.tree)
+  let distances tree p =
+    List.map (fun p' -> (p', distance p p')) (leaves tree.root)
 
 end

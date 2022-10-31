@@ -13,31 +13,38 @@ sig
   val norm : t -> float
   val map : (float -> float) -> t -> t
   val pp : Format.formatter -> t -> unit
+  val compare : t -> t -> int
 end
 
-module type Octree =
+module type M =
 sig
   type vec3
-  type t = Leaf of vec3 | Node of node
-  and node = { children : t option array; level : int; offset : vec3; }
-  type root = {
+  type t = {
     max_depth : int;
     size : float;
     origin : vec3;
-    tree : node;
+    root : node;
   }
+  and node = {
+    mutable children: children;
+    level: int;
+    offset: vec3;
+  }
+  and children =
+    | Nodes of node option array
+    | Points of vec3 list
   val pp : Format.formatter -> t -> unit
   val pp_node : Format.formatter -> node -> unit
-  val pp_root : Format.formatter -> root -> unit
-  val empty : ?size:float -> ?origin:vec3 -> int -> root
-  val add : root -> vec3 -> unit
-  val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> root
-  val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> root
+  val pp_children : Format.formatter -> children -> unit
+  val empty : ?size:float -> ?origin:vec3 -> int -> t
+  val add : t -> vec3 -> unit
+  val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> t
+  val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> t
   val leaves : node -> vec3 list
-  val tree_nearest : float -> vec3 -> node -> vec3 -> vec3
-  val nearest : root -> vec3 -> vec3
-  val distances : root -> vec3 -> (vec3 * float) list
+  val node_nearest : float -> vec3 -> node -> vec3 -> vec3
+  val nearest : t -> vec3 -> vec3
+  val distances : t -> vec3 -> (vec3 * float) list
 end
 
 module Make :
-  functor (V3 : Vec3) -> Octree with type vec3 = V3.t
+  functor (V3 : Vec3) -> M with type vec3 = V3.t
