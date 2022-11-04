@@ -15,6 +15,7 @@ depends: [
   "psq" {>= "0.2"}
   "ppx_deriving_popper" {with-test & >= "0.1.1"}
   "gg" {with-test & >= "1.0"}
+  "benchmark" {with-test & >= "1.6"}
   "odoc" {with-doc}
 ]
 build: [

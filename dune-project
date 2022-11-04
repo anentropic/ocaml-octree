@@ -19,6 +19,7 @@
   ; test deps
   (ppx_deriving_popper (and :with-test (>= 0.1.1)))
   (gg (and :with-test (>= 1.0)))
+  (benchmark (and :with-test (>= 1.6)))
   ; dev deps (to be installed manually)
   ; - ocaml-lsp-server
   ; - ocp-indent

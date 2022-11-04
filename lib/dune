@@ -4,3 +4,10 @@
  (preprocess
   (pps ppx_deriving.show))
  (libraries psq))
+
+; delete me
+
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))
