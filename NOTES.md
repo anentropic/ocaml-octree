@@ -1,52 +1,48 @@
 # NOTES
 
 ### TODO:
-support non-cubes? as long as you are happy with euclidean
-distance would it matter if space was cuboid rather than cube?
+support non-cubes?  
+as long as you are happy with euclidean distance would it matter if space was cuboid rather than cube?  
 (~cuboid = "right rectangular prism")
 
-Could we supply an alternative distance function?
+Could we supply an alternative distance function?  
 https://machinelearningmastery.com/distance-measures-for-machine-learning
 
 ### TODO:
-what if there are multiple equidistant matches? currently we just
-return the first leaf that wins the priority queue - psq will compare
-item values where their priority is equal, so we could tweak this to be
-deterministic (e.g. favour darkest or brightest value) or keep popping
-all the equal priorities and return a set?
+what if there are multiple equidistant matches? currently we just return the first leaf that wins the priority queue - psq will compare item values where their priority is equal, so we could tweak this to be deterministic (e.g. favour darkest or brightest value) or keep popping all the equal priorities and return a set?
 
 ### TODO:
-points should be unique? - currently no validation for duplicates
+points should be unique? - currently no validation for duplicates  
 (we may return one or all depending on equidistant behaviour)
 
 ### TODO:
-question - would it be in any way more efficient/better to store the
-tree as a 2D array on root instead of nested array-in-a-record-field ?
-See https://docs.rs/charcoal/1.0.0/charcoal/ maybe?
-"trees use some sort of backing storage to store the elements, typically a
-Vec (or its variants, like SmallVec or ArrayVec), and instead of using
-pointers to link to children, indices into the storage are used instead"
+question - would it be in any way more efficient/better to store the tree as a 2D array on root instead of nested array-in-a-record-field?
+
+See https://docs.rs/charcoal/1.0.0/charcoal/ maybe? (for inspiration)
+
+> "trees use some sort of backing storage to store the elements, typically a
+> Vec (or its variants, like SmallVec or ArrayVec), and instead of using
+> pointers to link to children, indices into the storage are used instead"
 
 ### TODO:
 uses for / methods of octrees other than nearest neighbour search:
-- point membership:  
-simplest one is "does point x exist in the point set?" i.e. no
-priority queue or octant distances needed, just go to the target leaf and
-check its point-set.
-- ray intersection:  
-https://daeken.svbtle.com/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
-http://bertolami.com/files/octrees.pdf
-Note: I think for both of these the tree stores triangles or polygons
-rather than points... or possibly it treats the octants themselves as
-the polygons, i.e. bounding boxes?
-a ray is "...best defined in parameterized form as a point (X0, Y0, Z0)
-and a direction vector (Dx, Dy, Dz)" seems like the line join those is
-like a 'unit length', you can keep adding D to the line to extend it.
-https://en.wikipedia.org/wiki/Ray_casting
-- collision detection:  
-more complicated... find points or polygons in the tree which are inside
-or intersect with the given bounding box (or other polygon)
-https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/
+
+- **point membership:**  
+simplest one is "does point x exist in the point set?" i.e. no priority queue or octant distances needed, just go to the target leaf and check its point-set.
+
+- **ray intersection:**  
+    https://daeken.svbtle.com/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+    http://bertolami.com/files/octrees.pdf  
+    Note: I think for both of these the tree stores triangles or polygons rather than points... or possibly it treats the octants themselves as the polygons, i.e. bounding boxes?
+
+    a ray is _"...best defined in parameterized form as a point (X0, Y0, Z0) and a direction vector (Dx, Dy, Dz)"_
+    
+    seems like the line joining those is like a 'unit length', you can keep adding D to the line to extend it.  
+    https://en.wikipedia.org/wiki/Ray_casting
+
+- **collision detection:**  
+more complicated... find points or polygons in the tree which are inside or intersect with the given bounding box (or other polygon)  
+https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/  
     ...lists four kinds:
     - Frustum intersections (i.e. camera view field)
     - Ray intersections (as above)
@@ -57,24 +53,21 @@ https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/i
     replacement. It will have to move octants, and prev one may now be empty.
 - https://en.wikipedia.org/wiki/Computational_geometry#Geometric_query_problems  
 
-See e.g. https://hackage.haskell.org/package/Octree-0.6.0.1/docs/Data-Octree.html
+See e.g.  
+https://hackage.haskell.org/package/Octree-0.6.0.1/docs/Data-Octree.html  
 https://github.com/BioHaskell/octree/blob/master/Data/Octree/Internal.hs
+
 - is generic on some opaque 'payload' that is stored alongside the point  
-...is that useful? seems likely to spoil memory usage
+  ...is that useful? seems likely to spoil memory usage
 - works without specifying any root size
 - octant distance calcs looks similar... but different?
-    - reformulated as a series of >= 0 checks instead of <= size checks
+    - reformulated as a series of `>= 0` checks instead of `<=` size checks
     - nice
-    - had to rewrite this in OCaml to understand what's going on
-- implementation does not seem to use pre-chosen depth, instead points are added
-to a leaf until it hits a limit (16) and then leaf is split adding a level
-...is this performance-tuned? i.e. it's as cheap to brute-force 16 points
-as to do 8 octants and then down a level?
-- Nodes only need a 'split point' V3 attribute... this condenses size and offset
-into one - I guess we don't need outer boundaries since we already split down
-from parent node. Our 'origin' is the parent's split point. Is theirs the same?
-- in case of creation from list: root origin is chosen by 'mass centre' of the
-whole list of points (rather than specified as an arg)
+    - had to [rewrite this in OCaml](tests/hask.ml) to understand what's going on
+- implementation does not seem to use pre-chosen depth, instead points are added to a leaf until it hits a limit (16) and then leaf is split adding a level  
+...is this performance-tuned? i.e. it's as cheap to brute-force 16 points as to do 8 octants and then down a level?
+- Nodes only need a 'split point' V3 attribute... this condenses size and offset into one - I guess we don't need outer boundaries since we already split down from parent node. Our 'origin' is the parent's split point. Is theirs the same?
+- in case of creation from list: root origin is chosen by 'mass centre' of the whole list of points (rather than specified as an arg)
 
 ## Methods:
 (from the Haskell implementation above)
