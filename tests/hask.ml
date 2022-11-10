@@ -91,7 +91,7 @@ let toggle dp odir =
 
 (*
   where [dp] is difference between pt and octant centre
-  ...which is like translating the pt & octant to world origin
+  ...which is like translating octant centre (with pt) to 0,0,0 origin
   and [odir] is the child octant id
 *)
 let octantDistance dp odir =
