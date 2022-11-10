@@ -51,16 +51,15 @@ module type M =
 sig
   type vec3
   type t = {
-    depth : int;
-    size : float;
-    origin : vec3;
+    depth : int;   (* number of subdivisions *)
+    size : float;  (* max value - min value *)
     root : node;
   }
   and node = {
     mutable children: children;
     level: int;
     id : int;
-    offset: vec3;
+    origin: vec3;
   }
   and children =
     | Nodes of node option array
@@ -73,18 +72,9 @@ sig
   val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> t
   val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> t
   val points : node -> vec3 list
-  val node_nearest : float -> vec3 -> node -> vec3 -> vec3
+  val node_nearest : float -> node -> vec3 -> vec3
   val nearest : t -> vec3 -> vec3
   val distances : t -> vec3 -> (vec3 * float) list
-  type tree_stats = {
-    points : int;
-    children : tree_stats option array;
-    min_points_per_leaf : int option;
-    max_points_per_leaf : int option;
-    avg_points_per_leaf : float option;
-  }
-  val pp_tree_stats : Format.formatter -> tree_stats -> unit
-  val stats : t -> tree_stats
 end
 
 (*
@@ -93,60 +83,6 @@ end
 
   the octree will be an 'axis-aligned' cube
   and all three axes will have the same scale
-  origin and size are configurable, as are number of 'levels'
-  i.e. subdivisions
-
-  TODO: support non-cubes? as long as you are happy with euclidean
-  distance would it matter if space was cuboid rather than cube?
-  (~cuboid = "right rectangular prism")
-
-  Could we supply an alternative distance function?
-  https://machinelearningmastery.com/distance-measures-for-machine-learning
-
-  TODO: what if there are multiple equidistant matches? currently we just
-  return the first leaf that wins the priority queue - psq will compare
-  item values where their priority is equal, so we could tweak this to be
-  deterministic (e.g. favour darkest or brightest value) or keep popping
-  all the equal priorities and return a set?
-
-  TODO: points should be unique? - currently no validation for duplicates
-  (we may return one or all depending on equidistant behaviour)
-
-  TODO: question - would it be in any way more efficient/better to store the
-  tree as a 2D array on root instead of nested array-in-a-record-field ?
-  See https://docs.rs/charcoal/1.0.0/charcoal/ maybe?
-  "trees use some sort of backing storage to store the elements, typically a
-  Vec (or its variants, like SmallVec or ArrayVec), and instead of using
-  pointers to link to children, indices into the storage are used instead"
-
-  TODO:
-  uses for / methods of octrees other than nearest neighbour search:
-  - point membership:
-    simplest one is "does point x exist in the point set?" i.e. no
-    priority queue or octant distances needed, just go to the target leaf and
-    check its point-set.
-  - ray intersection:
-    https://daeken.svbtle.com/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
-    http://bertolami.com/files/octrees.pdf
-    Note: I think for both of these the tree stores triangles or polygons
-    rather than points... or possibly it treats the octants themselves as
-    the polygons, i.e. bounding boxes?
-    a ray is "...best defined in parameterized form as a point (X0, Y0, Z0)
-    and a direction vector (Dx, Dy, Dz)" seems like the line join those is
-    like a 'unit length', you can keep adding D to the line to extend it.
-    https://en.wikipedia.org/wiki/Ray_casting
-  - collision detection:
-    more complicated... find points or polygons in the tree which are inside
-    or intersect with the given bounding box (or other polygon)
-    https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/
-    ...lists four kinds:
-    - Frustum intersections (i.e. camera view field)
-    - Ray intersections (as above)
-    - Bounding Box intersections
-    - Bounding Sphere Intersections
-  - update value of a point:
-    i.e. you have a scene where things are moving, either by mutation or
-    replacement. It will have to move octants, and prev one may now be empty.
 *)
 module Make = functor (V3 : Vec3) ->
 struct
@@ -159,16 +95,15 @@ struct
 
 
   type t = {
-    depth: int;
-    size: float;
-    origin: vec3;
+    depth: int;   (* TODO: can this be eliminated? *)
+    size: float;  (* TODO: can this be eliminated? *)
     root: node;
   }
   and node = {
     mutable children: children;
     level: int;  (* root is 0 *)
     id : int;
-    offset: vec3;
+    origin: vec3;
   }
   and children =
     | Nodes of node option array
@@ -211,12 +146,11 @@ struct
           children = root_children depth;
           level = 0;
           id = 0;
-          offset = V3.of_tuple (0., 0., 0.);
+          origin;
         }
       in
       {
         depth;
-        origin;
         size;
         root;
       }
@@ -232,7 +166,7 @@ struct
   let octant_index_for_p root_size parent p =
     let subdiv = octant_size root_size (parent.level + 1) in
     let mask getter mask =
-      let mid = getter parent.offset +. subdiv in
+      let mid = getter parent.origin +. subdiv in
       match getter p with
       | a when a < mid -> 0
       | _ -> mask
@@ -244,8 +178,8 @@ struct
     let offset_size = octant_size root_size (parent.level + 1) in
     let offset getter mask =
       match index land mask with  (* 0 or 1 *)
-      | 0 -> getter parent.offset
-      | _ -> getter parent.offset +. offset_size
+      | 0 -> getter parent.origin
+      | _ -> getter parent.origin +. offset_size
     in
     V3.of_tuple ((offset V3.x 4), (offset V3.y 2), (offset V3.z 1))
 
@@ -331,7 +265,7 @@ struct
         (* inner node *)
         let level = parent.level + 1 in
         let index = octant_index_for_p tree.size parent p in
-        let offset = octant_offset tree.size parent index in
+        let origin = octant_offset tree.size parent index in
         let id = (parent.id lsl 3) lor index in
         let children =
           match level with
@@ -346,7 +280,7 @@ struct
               children;
               level;
               id;
-              offset;  (* relative to root *)
+              origin;  (* relative to root *)
             }
         end
         in
@@ -416,7 +350,7 @@ struct
     Find the distance from [p] to the nearest face, edge or vertex of [octant]
     Method from: https://math.stackexchange.com/a/2133235/181250
   *)
-  let octant_surface_distance root_size root_origin octant p =
+  let octant_surface_distance root_size octant p =
     (*
       We want to translate our octant so that its centre lies at 0,0
       (makes the big if/else below simpler)
@@ -425,52 +359,21 @@ struct
       and then calculate surface distance as if octant was translated.
 
       TODO: scaled octant offsets could be pre-calculated, the scalings
-      are different for each octant but they are static
-
-      TODO: point is in wrong octant
-      y and z values are bigger than the bounds
-
-      | Octant(level:3, id:001000001):
-      | offset by: (-0.031250, -0.031250, -0.656250)
-      | (0.000000, 0.000000, 0.625000)  -->  (-0.031250, -0.031250, -0.031250)
-      |<(0.062500, 0.062500, 0.687500)> --> <(0.031250, 0.031250, 0.031250)>
-      | Octant points'
-      [(0.040810, 0.120397, 0.712801)] --> [(0.009560, 0.089147, 0.056551)]
-      | Point: (0.333300, 0.410000, 0.666700) --> (0.302050, 0.378750, 0.010450)
-      | Brute-force d: 0.414180
+      are different for each octant but they are static. However...
+      This answer https://stackoverflow.com/a/48330314/202168 suggests that
+      with large numbers of points (10k) it's faster *not* to precalculate
+      because reducing memory size of nodes improves cpu cache usage.
+      It also strongly recommends not storing points in the leaves, and
+      perhaps not nodes within ndoes at all, instead these should be indexes
+      into a flat top-level data structure, again for better cpu cache usage.
     *)
     let octsize = octant_size root_size octant.level in
     let s = octsize /. 2. in
     (* Format.printf "| s: %f\n" s; *)
-    let oct_centre_offset = V3.add octant.offset (V3.of_tuple (repeat_3 s)) in
-    (* root origin is a distance from 0,0, octant.offset is relative to root origin *)
-    let root_offset = V3.sub (V3.of_tuple (0., 0., 0.)) root_origin in
-    let offset = V3.sub root_offset oct_centre_offset in
+    let oct_centre_offset = V3.add octant.origin (V3.of_tuple (repeat_3 s)) in
+    (* root origin is a distance from 0,0, octant.origin is relative to root origin *)
+    let offset = V3.sub (V3.of_tuple (0., 0., 0.)) oct_centre_offset in
     let p' = V3.add p offset in
-    (* Format.printf "| Octant(level:%i, id:%s):\n| offset by: %a\n"
-       octant.level
-       (id_to_string octant.level octant.id)
-       pp_vec3 offset;
-       Format.printf "| %a  -->  %a\n" pp_vec3 octant.offset pp_vec3 (V3.add octant.offset offset); *)
-    let far_corner =
-      (V3.add
-         octant.offset
-         (V3.of_tuple (repeat_3 octsize)))
-    in
-    (* Format.printf "|<%a> --> <%a>\n" pp_vec3 far_corner pp_vec3 (V3.add far_corner offset); *)
-    let offset_points =
-      List.map (fun p'' ->
-          V3.add p'' offset
-        ) (points octant)    
-    in
-    (* Format.printf "| Octant points' %a --> %a\n" pp_v3_list (points octant) pp_v3_list offset_points;
-       Format.printf "| Point: %a --> %a\n" pp_vec3 p pp_vec3 p'; *)
-    let brute_force =
-      List.map (distance p') offset_points
-      |> List.sort compare
-      |> List.hd
-    in
-    (* Format.printf "| Brute-force d: %f\n" brute_force; *)
     (*
       For this calculation the point [p] has one of 27 possible positions
       in relation to the octant, which correspond to the 26 adjacent octants
@@ -481,61 +384,48 @@ struct
       (I think these are Euclidean distance too)
     *)
     let x, y, z = p' |> V3.map abs_float |> V3.to_tuple in
-    let d =
-      if x <= s then
-        if y <= s then
-          (* without the max this would give negative distance in case where
-             p is in octant - that would actually still work with our pq
-             TODO test edge case where point is on boundary ... can we
-             ever get a point and an adjacent octant both returning 0. ? *)
-          begin
-            (* face *)
-            (* Format.printf "| case 1: x <= s y <= s : z - s\n"; *)
-            max 0. (z -. s)  (* 0 if p in octant, all other cases return > 0 *)
-          end
-        else
-        if z <= s then
-          begin
-            (* face *)
-            (* Format.printf "| case 2: x <= s z <= s : y - s\n"; *)
-            y -. s
-          end
-        else
-          begin
-            (* edge *)
-            (* Format.printf "| case 3: x <= s : √(y-s)^2+(z-s)^2\n"; *)
-            sqrt ((y -. s) ** 2. +. (z -. s) ** 2.)
-          end
-      else
+    if x <= s then
       if y <= s then
-        if z <= s then
-          begin
-            (* face *)
-            (* Format.printf "| case 4: y <= s z <= s : x - s\n"; *)
-            x -. s
-          end
-        else
-          begin
-            (* edge *)
-            (* Format.printf "| case 5: y <= s : √(x-s)^2+(z-s)^2\n"; *)
-            sqrt ((x -. s) ** 2. +. (z -. s) ** 2.)
-          end
+        (* without the max this would give negative distance in case where
+            p is in octant - that would actually still work with our pq *)
+        begin
+          (* face *)
+          max 0. (z -. s)  (* 0 if p in octant, all other cases return > 0 *)
+        end
       else
       if z <= s then
         begin
-          (* edge *)
-          (* Format.printf "| case 6: z <= s : √(x-s)^2+(y-s)^2\n"; *)
-          sqrt ((x -. s) ** 2. +. (y -. s) ** 2.)
+          (* face *)
+          y -. s
         end
       else
         begin
-          (* vertex *)
-          (* Format.printf "| case 7: else : √(x-s)^2+(y-s)^2+(z-s)^2\n"; *)
-          sqrt ((x -. s) ** 2. +. (y -. s) ** 2. +. (z -. s) ** 2.)
+          (* edge *)
+          sqrt ((y -. s) ** 2. +. (z -. s) ** 2.)
         end
-    in
-    (* Printf.printf "| Surface d: %f\n" d; *)
-    d
+    else
+    if y <= s then
+      if z <= s then
+        begin
+          (* face *)
+          x -. s
+        end
+      else
+        begin
+          (* edge *)
+          sqrt ((x -. s) ** 2. +. (z -. s) ** 2.)
+        end
+    else
+    if z <= s then
+      begin
+        (* edge *)
+        sqrt ((x -. s) ** 2. +. (y -. s) ** 2.)
+      end
+    else
+      begin
+        (* vertex *)
+        sqrt ((x -. s) ** 2. +. (y -. s) ** 2. +. (z -. s) ** 2.)
+      end
 
   type child =
     | Node of node
@@ -563,7 +453,7 @@ struct
           node.level
           (id_to_string node.level node.id)
           pp_point_list points
-          pp_vec3 node.offset
+          pp_vec3 node.origin
       (* pp_node fmt node *)
       | Point point -> Format.fprintf fmt "Point%a" pp_vec3 point
   end
@@ -599,24 +489,13 @@ struct
       d
 
   (* TODO return option type instead of raise Not_found ? *)
-  let node_nearest root_size root_offset node p =
+  let node_nearest root_size node p =
     let rec nearest' pq children p =
       (* enqueue children of current octant *)
       let items = Seq.map (fun child ->
           match child with
           | Node node ->
-            let d = octant_surface_distance root_size root_offset node p in
-            let d' =
-              List.map (distance p) (points node)
-              |> List.sort compare
-              |> List.hd
-            in
-            let _ =
-              if d' < d then
-                (* raise @@ Invalid_argument
-                   (Printf.sprintf "Bruce force %f < Oct-surface %f" d' d) *)
-                Printf.printf ":: Bruce force %f < Oct-surface %f\n" d' d
-            in
+            let d = octant_surface_distance root_size node p in
             (Node node, d)
           | Point p' -> 
             let d = distance p p' in
@@ -625,7 +504,6 @@ struct
       in
       let _items = List.of_seq items in
       let pq = PQ.add_seq items pq in
-      (* Format.printf "PQ: %a\n" (PQ.pp_dump PQ_Item.pp PQ_Priority.pp) pq; *)
       (* pop current best match *)
       match PQ.pop pq with
       | Some ((child, _), pq) -> begin
@@ -637,86 +515,8 @@ struct
     in
     nearest' PQ.empty (children_to_seq node.children) p
 
-  type tree_stats = {
-    points : int;
-    children : tree_stats option array;
-    min_points_per_leaf : int option;
-    max_points_per_leaf : int option;
-    avg_points_per_leaf : float option;
-  }
-  [@@deriving show]
-
-  let stats tree =
-    let stats_fold f i children =
-      Array.fold_left (fun a child ->
-          match child with
-          | Some ts -> f a ts
-          | None -> a
-        ) i children
-    in
-    let rec stats' parent =
-      let points = List.length @@ points parent in
-      let children =
-        match parent.children with
-        | Nodes nodes -> begin
-            Array.map (fun a ->
-                match a with
-                | Some node -> Some (stats' node)
-                | None -> None
-              ) nodes
-          end
-        | Points _ -> Array.make 8 None
-      in
-      match parent.level with
-      | l when l < tree.depth ->
-        let min_points_per_leaf =
-          stats_fold (fun a ts ->
-              let cmp_val =
-                match ts.min_points_per_leaf with
-                | Some _ as mppl -> mppl
-                | None -> Some 0
-              in
-              match compare cmp_val a with
-              | -1 -> cmp_val
-              | _ -> a
-            ) (Some 0) children
-        in
-        let max_points_per_leaf =
-          stats_fold (fun a ts ->
-              let cmp_val =
-                match ts.max_points_per_leaf with
-                | Some _ as mppl -> mppl
-                | None -> Some ts.points
-              in
-              match compare cmp_val a with
-              | 1 -> cmp_val
-              | _ -> a
-            ) (Some 0) children
-        in
-        let avg_points_per_leaf =
-          let sum = stats_fold (fun a ts -> a + ts.points) 0 children in
-          Some ((Float.of_int sum) /. (Float.of_int points))
-        in
-        {
-          points;
-          children;
-          min_points_per_leaf;
-          max_points_per_leaf;
-          avg_points_per_leaf;
-        }
-      | _ ->
-        {
-          points;
-          children;
-          min_points_per_leaf = None;
-          max_points_per_leaf = None;
-          avg_points_per_leaf = None;
-        }
-    in
-    stats' tree.root
-
   let nearest tree p =
-    node_nearest tree.size tree.origin tree.root p
+    node_nearest tree.size tree.root p
 
   let distances tree p =
     List.map (fun p' -> (p', distance p p')) (points tree.root)

@@ -71,7 +71,6 @@ let sort_ggv3_list = List.sort Gg.V3.compare
 
 let compare_oktree = Comparator.make compare O.pp
 let compare_oktree_node = Comparator.make compare O.pp_node
-let compare_tree_stats = Comparator.make compare O.pp_tree_stats
 
 let distance a b = Gg.V3.sub a b |> Gg.V3.norm
 
@@ -99,13 +98,12 @@ let test_empty =
   let expected : O.t =
     {
       depth;
-      origin = Gg.V3.of_tuple (0., 0., 0.);
       size = 1.;
       root = {
         children = Nodes (Array.make 8 None);
         level = 0;
         id = 0;
-        offset = Gg.V3.of_tuple (0., 0., 0.);
+        origin = Gg.V3.of_tuple (0., 0., 0.);
       }
     }
   in
@@ -118,13 +116,12 @@ let test_empty_depth_1 =
   let expected : O.t =
     {
       depth;
-      origin = Gg.V3.of_tuple (0., 0., 0.);
       size = 1.;
       root = {
         children = Points [];
         level = 0;
         id = 0;
-        offset = Gg.V3.of_tuple (0., 0., 0.);
+        origin = Gg.V3.of_tuple (0., 0., 0.);
       }
     }
   in
@@ -143,22 +140,6 @@ let test_points =
   O.add tree Gg.V3.zero;
   let points = O.points tree.root in
   equal Comparator.(list compare_ggv3) [Gg.V3.zero] points
-
-let test_stats =
-  test @@ fun () ->
-  let tree = O.empty 1 in
-  O.add tree Gg.V3.zero;
-  let result = O.stats tree in
-  let expected : O.tree_stats =
-    {
-      points = 1;
-      children = Array.make 8 None;
-      min_points_per_leaf = (Some 0);
-      max_points_per_leaf = (Some 0);
-      avg_points_per_leaf = (Some 0.);
-    }
-  in
-  equal compare_tree_stats expected result
 
 let test_of_list =
   test @@ fun () ->
@@ -319,7 +300,6 @@ let tests =
     [
       ("empty", empty_suite);
       ("points", test_points);
-      ("stats", test_stats);
       ("of_list", of_list_suite);
       ("nearest", nearest_suite);
     ]

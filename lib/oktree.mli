@@ -22,14 +22,13 @@ sig
   type t = {
     depth : int;
     size : float;
-    origin : vec3;
     root : node;
   }
   and node = {
     mutable children: children;
     level: int;
     id : int;
-    offset: vec3;
+    origin: vec3;
   }
   and children =
     | Nodes of node option array
@@ -42,18 +41,9 @@ sig
   val of_list : ?size:float -> ?origin:vec3 -> int -> vec3 list -> t
   val of_seq : ?size:float -> ?origin:vec3 -> int -> vec3 Seq.t -> t
   val points : node -> vec3 list
-  val node_nearest : float -> vec3 -> node -> vec3 -> vec3
+  val node_nearest : float -> node -> vec3 -> vec3
   val nearest : t -> vec3 -> vec3
   val distances : t -> vec3 -> (vec3 * float) list
-  type tree_stats = {
-    points : int;
-    children : tree_stats option array;
-    min_points_per_leaf : int option;
-    max_points_per_leaf : int option;
-    avg_points_per_leaf : float option;
-  }
-  val pp_tree_stats : Format.formatter -> tree_stats -> unit
-  val stats : t -> tree_stats
 end
 
 module Make :
