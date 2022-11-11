@@ -41,17 +41,31 @@ simplest one is "does point x exist in the point set?" i.e. no priority queue or
     https://en.wikipedia.org/wiki/Ray_casting
 
 - **collision detection:**  
-more complicated... find points or polygons in the tree which are inside or intersect with the given bounding box (or other polygon)  
-https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/  
+    more complicated... find points or polygons in the tree which are inside or intersect with the given bounding box (or other polygon)  
+    https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/  
     ...lists four kinds:
     - Frustum intersections (i.e. camera view field)
     - Ray intersections (as above)
     - Bounding Box intersections
     - Bounding Sphere Intersections
-    - update value of a point:
+
+- **update value of a point:**  
     i.e. you have a scene where things are moving, either by mutation or
     replacement. It will have to move octants, and prev one may now be empty.
-- https://en.wikipedia.org/wiki/Computational_geometry#Geometric_query_problems  
+
+- **"geometric query problems"**  
+    https://en.wikipedia.org/wiki/Computational_geometry#Geometric_query_problems
+
+- **"poisson hardcode process"**  
+    https://www.mathematik.uni-ulm.de/stochastik/aktuelles/sh06/sh_schmidt.pdf
+
+    Here is an interesting one. If you sample points from a uniform distribution the result often looks surprisingly 'clumpy', because that's what true randomness looks like (especially with fewer points)
+
+    It uses a "Poisson process" to randomly place points, then:
+
+    > Cancel all those points whose distance to their nearest neighbor is smaller than some R > 0
+
+    The result is something that looks more visually uniform.
 
 See e.g.  
 https://hackage.haskell.org/package/Octree-0.6.0.1/docs/Data-Octree.html  
@@ -115,9 +129,9 @@ https://github.com/BioHaskell/octree/blob/master/Data/Octree/Internal.hs
 
 - https://hackage.haskell.org/package/filtrable-0.1.1.0/docs/Data-Filtrable.html
 
-- https://github.com/thierry-martinez/traverse
+- https://github.com/thierry-martinez/traverse OCaml
 
-- https://mattwindsor91.github.io/travesty/travesty/Travesty/Traversable/index.html
+- https://mattwindsor91.github.io/travesty/travesty/Travesty/Traversable/index.html OCaml
 
 - https://blog.shaynefletcher.org/2017/05/more-type-classes-in-ocaml.html  
     various including *Applicative* and *Traversable*
@@ -128,7 +142,7 @@ https://github.com/BioHaskell/octree/blob/master/Data/Octree/Internal.hs
     
     i.e. filter_map
 
-- https://discuss.ocaml.org/t/notes-from-compose-2017/240/6?u=anentropic  
+- https://discuss.ocaml.org/t/notes-from-compose-2017/240/6  
     shows trivial-looking implementation of *Applicative* and *Traversable*
 
 - It's probably a https://wiki.haskell.org/Monoid too?
@@ -228,13 +242,13 @@ https://github.com/BioHaskell/octree/blob/master/Data/Octree/Internal.hs
 
     - **paramorphism** 🤷‍♂️ 🤷‍♂️ 🤷‍♂️
 
-    http://wide.land/hop/generalized_fold.html
+    http://wide.land/hop/generalized_fold.html OCaml
 
     > This technique constructs something called a catamorphism, aka a generalized fold operation. To learn more about catamorphisms, take a course on category theory, such as CS 6117.
 
     👌
 
-    http://wide.land/hop/fold_trees.html
+    http://wide.land/hop/fold_trees.html OCaml
 
     > We can then use foldtree to implement some of the tree functions we've previously seen:
 
@@ -294,5 +308,11 @@ https://github.com/BioHaskell/octree/blob/master/Data/Octree/Internal.hs
 
     Discusses how `filter_tree` must discard children when a node is filtered out.
 
-    So our `nearest` is like a filter + fold, but at the same time.
+    So our `nearest` is like a filter + fold, but at the same time?
+
+    No exactly though, it's neither. A fold should visit every element (?) And a filter does not reduce - we are not doing a boolean test.
+    
+    We are kind of folding whole branches of the tree, but also deciding in that fold whether to recurse.
+
+    But the end result is same as if we visited every element.
 
