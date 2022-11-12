@@ -225,19 +225,13 @@ let test_nearest4 =
   equal compare_ggv3 result expected
 
 let test_nearest_sample_nonempty =
-  test @@ fun () ->
+  test ~config:(Config.num_samples 5000) @@ fun () ->
   let* points =
     Sample.with_log
       "Sample points"
       pp_point_list
       Sample.List.(non_empty @@ sample_ggv3 0. 1.)
   in
-  (* let* target =
-     Sample.with_log
-      "Target point"
-      Gg.V3.pp
-      (sample_ggv3 0. 1.)
-     in *)
   let target = Gg.V3.v 0.3333 0.41 0.6667 in
   let* _ = 
     Sample.log_key_value "Length" (List.length points |> Int.to_string)
@@ -254,12 +248,6 @@ let test_nearest_sample_nonempty =
   let* _ = 
     Sample.log_key_value "Result distance" @@ Float.to_string (distance target result)
   in
-  (* let* _ = 
-     Sample.log_key_value "Tree" @@ (Format.asprintf "%a" O.pp tree)
-     in *)
-  (* let* _ = 
-     Sample.log_key_value "Stats" @@ (Format.asprintf "%a" O.pp_tree_stats @@ O.stats tree)
-     in *)
   equal compare_ggv3 result expected
 
 let test_nearest_sample_empty =
