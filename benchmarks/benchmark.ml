@@ -21,6 +21,8 @@ let points dist n =
 
 let target () = List.hd @@ points Mat.uniform 1
 
+let distance a b = V3.sub a b |> V3.norm
+
 (* TESTS *)
 
 (* points in a 'uniform' distribution
@@ -37,6 +39,14 @@ let test_normal n depth =
   let pt = target () in
   Core.Staged.stage @@ fun () -> O.nearest tree pt
 
+let test_control n =
+  let pt = target () in
+  let pts = points Mat.uniform n in
+  fun () ->
+    List.map (fun p' -> (distance p' pt, p')) @@ pts
+    |> List.sort compare
+    |> List.hd
+    |> snd
 
 let main () =
   ignore @@ Command_unix.run (Bench.make_command [
@@ -51,6 +61,12 @@ let main () =
         Bench.Test.create_indexed ~name:"pts:1024 depth" ~args:[4; 5; 6;] @@ test_normal 1024;
         Bench.Test.create_indexed ~name:"pts:65536 depth" ~args:[4; 5; 6;] @@ test_normal 65536;
         Bench.Test.create_indexed ~name:"pts:2097152 depth" ~args:[4; 5; 6;] @@ test_uniform 2097152;
+      ];
+      Bench.Test.create_group ~name:"Control (list cmp + sort)" [
+        Bench.Test.create ~name:"pts:256 depth" @@ test_control 256;
+        Bench.Test.create ~name:"pts:1024 depth" @@ test_control 1024;
+        Bench.Test.create ~name:"pts:65536 depth" @@ test_control 65536;
+        (* Bench.Test.create ~name:"pts:2097152 depth" @@ test_control 2097152; *)
       ];
     ])
 
