@@ -1,0 +1,9 @@
+(executable
+ (name benchmark)
+ (modules benchmark)
+ (libraries bechamel bechamel-notty notty.unix owl gg oktree))
+
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))
