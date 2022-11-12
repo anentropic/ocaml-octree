@@ -1,6 +1,6 @@
-open Bechamel
 open Gg
 open Owl
+open Core_bench
 
 (*
   dune build
@@ -21,78 +21,37 @@ let points dist n =
 
 let target () = List.hd @@ points Mat.uniform 1
 
-let product2 a b =
-  List.concat_map (fun x ->
-      List.map (fun y -> x, y) b
-    ) a
+(* TESTS *)
 
-(* tests *)
-
-let test_uniform depth n =
+(* points in a 'uniform' distribution
+   ...are completely random, although can look 'clumpy' to the eye*)
+let test_uniform n depth =
   let tree = O.of_list depth (points Mat.uniform n) in
   let pt = target () in
-  let name = Printf.sprintf "uniform, depth: %i, %i pts" depth n in
-  Test.make ~name (Staged.stage @@ fun () -> O.nearest tree pt)
+  Core.Staged.stage @@ fun () -> O.nearest tree pt
 
-let test_normal depth n =
+(* points in a 'normal' distribution
+   ...will be denser in the centre / have more outliers*)
+let test_normal n depth =
   let tree = O.of_list depth (points Mat.gaussian n) in
   let pt = target () in
-  let name = Printf.sprintf "normal, depth: %i, %i pts" depth n in
-  Test.make ~name (Staged.stage @@ fun () -> O.nearest tree pt)
+  Core.Staged.stage @@ fun () -> O.nearest tree pt
 
 
-let test =
-  let args = product2 [4; 8; 12;] [256; 1024; 65536;] in
-  let tests maker =
-    List.map (fun (depth, count) -> maker depth count) args
-  in
-  (* the full test suite
-     timings seem to vary wildly between runs though 😞 *)
-  Test.make_grouped ~name:"Oktree" ~fmt:"%s: %s" [
-    Test.make_grouped ~name:"Uniform dist" ~fmt:"%s: (%s)" @@ tests test_uniform;
-    Test.make_grouped ~name:"Normal dist" ~fmt:"%s: (%s)" @@ tests test_normal;
-  ]
-(* seem to get different GC behaviour if we just run a couple of tests
-   ...it shows 0 mjw/run for the full suite 🤷‍♂️ *)
-(* Test.make_grouped ~name:"Oktree" ~fmt:"%s: %s" [
-   test_uniform 4 256;
-   test_uniform 4 1024;
-   ] *)
+let main () =
+  ignore @@ Command_unix.run (Bench.make_command [
+      Bench.Test.create_group ~name:"Uniform dist" [
+        Bench.Test.create_indexed ~name:"pts:256 depth" ~args:[4; 5; 6;] @@ test_uniform 256;
+        Bench.Test.create_indexed ~name:"pts:1024 depth" ~args:[4; 5; 6;] @@ test_uniform 1024;
+        Bench.Test.create_indexed ~name:"pts:65536 depth" ~args:[4; 5; 6;] @@ test_uniform 65536;
+        Bench.Test.create_indexed ~name:"pts:2097152 depth" ~args:[4; 5; 6;] @@ test_uniform 2097152;
+      ];
+      Bench.Test.create_group ~name:"Normal dist" [
+        Bench.Test.create_indexed ~name:"pts:256 depth" ~args:[4; 5; 6;] @@ test_normal 256;
+        Bench.Test.create_indexed ~name:"pts:1024 depth" ~args:[4; 5; 6;] @@ test_normal 1024;
+        Bench.Test.create_indexed ~name:"pts:65536 depth" ~args:[4; 5; 6;] @@ test_normal 65536;
+        Bench.Test.create_indexed ~name:"pts:2097152 depth" ~args:[4; 5; 6;] @@ test_uniform 2097152;
+      ];
+    ])
 
-let benchmark () =
-  let ols =
-    Analyze.ols ~bootstrap:0 ~r_square:true ~predictors:Measure.[| run |]
-  in
-  let instances =
-    Toolkit.Instance.[ minor_allocated; major_allocated; monotonic_clock ]
-  in
-  let cfg =
-    Benchmark.cfg ~limit:2000 ~quota:(Time.second 0.5) ~kde:(Some 1000) ~stabilize:true ()
-  in
-  let raw_results = Benchmark.all cfg instances test in
-  let results =
-    List.map (fun instance -> Analyze.all ols instance raw_results) instances
-  in
-  let results = Analyze.merge ols instances results in
-  (results, raw_results)
-
-let () =
-  List.iter
-    (fun v -> Bechamel_notty.Unit.add v (Measure.unit v))
-    Toolkit.Instance.[ minor_allocated; major_allocated; monotonic_clock ]
-
-let img (window, results) =
-  Bechamel_notty.Multiple.image_of_ols_results ~rect:window
-    ~predictor:Measure.run results
-
-open Notty_unix
-
-let () =
-  let window =
-    match winsize Unix.stdout with
-    | Some (w, h) -> { Bechamel_notty.w; h }
-    | None -> { Bechamel_notty.w = 80; h = 1 }
-  in
-  let results, _ = benchmark () in
-  print_endline "";
-  img (window, results) |> eol |> output_image
+let () = main ()

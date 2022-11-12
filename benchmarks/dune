@@ -1,7 +1,7 @@
 (executable
  (name benchmark)
  (modules benchmark)
- (libraries bechamel bechamel-notty notty.unix owl gg oktree))
+ (libraries core_bench core core_unix.command_unix owl gg oktree))
 
 (env
  (dev
