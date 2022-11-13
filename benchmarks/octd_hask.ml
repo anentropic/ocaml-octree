@@ -55,7 +55,7 @@ let octantDistance' dp = function
   | SWD -> V3.norm dp
 
 let allOctants =
-  List.init max_odir (fun i -> odir_of_enum i |> Option.get)
+  List.init (max_odir + 1) (fun i -> odir_of_enum i |> Option.get)
 
 
 (*

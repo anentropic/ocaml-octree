@@ -7,7 +7,7 @@ Made using https://github.com/janestreet/core_bench
 
 ```shell
 dune build
-_build/default/benchmarks/benchmark.exe -quota 3
+_build/default/benchmarks/nearest.exe -quota 3
 ```
 
 ### "Original implementation"

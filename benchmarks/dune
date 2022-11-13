@@ -1,6 +1,20 @@
 (executable
- (name benchmark)
- (modules benchmark)
+ (name nearest)
+ (modules nearest)
+ (libraries core_bench core core_unix.command_unix owl gg oktree))
+
+(executable
+ (name octant_distance)
+ (modules octant_distance octd_original octd_hask)
+ (preprocess
+  (pps
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_deriving.eq
+   ppx_deriving.enum
+   ppx_deriving.map
+   ppx_deriving.fold
+   ppx_deriving.iter))
  (libraries core_bench core core_unix.command_unix owl gg oktree))
 
 (env
