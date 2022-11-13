@@ -101,18 +101,18 @@ let octantDistances dp =
   List.map (fun o -> (o, octantDistance dp o)) allOctants
 
 
-(* didn't bother translating all of this
+(* UNUSED: *)
+
+(* didn't bother translating all of this  
    the important part is how [octantDistances] is called *)
-let nearest ot pt =
+let nearest ot pt = 
   match ot with
   | (Leaf _) -> ()
   | (Node node) -> begin
       let distances = octantDistances @@ (V3.sub pt node.split) in
       ignore @@ distances;
       ()
-    end
-
-(* unused *)
+    end  
 
 (* gives octant of a first vector relative to the second vector as a center *)
 let cmp ca cb =

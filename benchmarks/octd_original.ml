@@ -55,18 +55,9 @@ let octant_surface_distance root_size octant p =
     (makes the big if/else below simpler)
     We don't actually translate the octant, but rather the point [p]
     and then calculate surface distance as if octant was translated.
-    TODO: scaled octant offsets could be pre-calculated, the scalings
-    are different for each octant but they are static. However...
-    This answer https://stackoverflow.com/a/48330314/202168 suggests that
-    with large numbers of points (10k) it's faster *not* to precalculate
-    because reducing memory size of nodes improves cpu cache usage.
-    It also strongly recommends not storing points in the leaves, and
-    perhaps not nodes within ndoes at all, instead these should be indexes
-    into a flat top-level data structure, again for better cpu cache usage.
   *)
   let octsize = octant_size root_size octant.level in
   let s = octsize /. 2. in
-  (* Format.printf "| s: %f\n" s; *)
   let oct_centre_offset = V3.add octant.origin (V3.of_tuple (repeat_3 s)) in
   (* root origin is a distance from 0,0, octant.origin is relative to root origin *)
   let offset = V3.sub (V3.of_tuple (0., 0., 0.)) oct_centre_offset in
@@ -78,48 +69,32 @@ let octant_surface_distance root_size octant p =
     26 adjacent = 6 face:face + 8 vertex:vertex + 12 edge:edge
     By taking |abs| values these are collapsed down to the 7+1 cases below,
     finding the distance to nearest face, vertex or edge as appropriate.
-    (I think these are Euclidean distance too)
   *)
   let x, y, z = p' |> V3.map abs_float |> V3.to_tuple in
   if x <= s then
     if y <= s then
-      (* without the max this would give negative distance in case where
-          p is in octant - that would actually still work with our pq *)
-      begin
-        (* face *)
-        max 0. (z -. s)  (* 0 if p in octant, all other cases return > 0 *)
-      end
+      (* face *)
+      (* without the max this would give negative distance in case where p is in octant *)
+      max 0. (z -. s)  (* 0 if p in octant, all other cases return > 0 *)
     else
     if z <= s then
-      begin
-        (* face *)
-        y -. s
-      end
+      (* face *)
+      y -. s
     else
-      begin
-        (* edge *)
-        sqrt ((y -. s) ** 2. +. (z -. s) ** 2.)
-      end
+      (* edge *)
+      sqrt ((y -. s) ** 2. +. (z -. s) ** 2.)
   else
   if y <= s then
     if z <= s then
-      begin
-        (* face *)
-        x -. s
-      end
+      (* face *)
+      x -. s
     else
-      begin
-        (* edge *)
-        sqrt ((x -. s) ** 2. +. (z -. s) ** 2.)
-      end
+      (* edge *)
+      sqrt ((x -. s) ** 2. +. (z -. s) ** 2.)
   else
   if z <= s then
-    begin
-      (* edge *)
-      sqrt ((x -. s) ** 2. +. (y -. s) ** 2.)
-    end
+    (* edge *)
+    sqrt ((x -. s) ** 2. +. (y -. s) ** 2.)
   else
-    begin
-      (* vertex *)
-      sqrt ((x -. s) ** 2. +. (y -. s) ** 2. +. (z -. s) ** 2.)
-    end
+    (* vertex *)
+    sqrt ((x -. s) ** 2. +. (y -. s) ** 2. +. (z -. s) ** 2.)
