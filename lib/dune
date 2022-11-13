@@ -2,7 +2,14 @@
  (name oktree)
  (public_name oktree)
  (preprocess
-  (pps ppx_deriving.show))
+  (pps
+   ppx_deriving.show
+   ppx_deriving.ord
+   ppx_deriving.eq
+   ppx_deriving.enum
+   ppx_deriving.map
+   ppx_deriving.fold
+   ppx_deriving.iter))
  (libraries psq))
 
 ; delete me
