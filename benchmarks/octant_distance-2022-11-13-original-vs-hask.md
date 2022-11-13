@@ -18,7 +18,7 @@ The original version required both a translation and a scaling, I eliminated the
 
 But in both cases it requires that we know the size (length of side) of our octants.
 
-Commit [d1f6ca1](https://github.com/anentropic/ocaml-oktree/tree/d1f6ca1/)
+See: https://github.com/anentropic/ocaml-oktree/blob/9397913/benchmarks/octd_original.ml
 
 Using `Gg.V3` as the point type.
 
@@ -30,7 +30,9 @@ I found this Haskell octree implementation: https://github.com/BioHaskell/octree
 
 One nice thing I saw in their version was you don't have to know the octant size. This means you don't have to specify the bounding-box size of root of the tree up-front. So instead of an origin and a size, the octants only need a centre point.
 
-So I converted their code to OCaml with a view to borrowing it. It was pretty straightforward and literal translation.
+So I converted their code to OCaml with a view to borrowing it. It was pretty straightforward to do a literal translation.
+
+See: https://github.com/anentropic/ocaml-oktree/blob/9397913/benchmarks/octd_hask.ml
 
 Using `Gg.V3` as the point type.
 
