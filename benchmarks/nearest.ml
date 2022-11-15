@@ -4,12 +4,13 @@ open Core_bench
 
 (*
   dune build
-  dune exec benchmarks/nearest.exe
+  dune exec benchmarks/nearest.exe -quota 3 -stabilize-gc
   or
-  _build/default/benchmarks/nearest.exe
+  _build/default/benchmarks/nearest.exe -quota 3 -stabilize-gc
 
   (if you get "Regression failed ... because the predictors were linearly
-  dependent" when using a low quota try just up the quota, seems to be that)
+  dependent" when using a low quota try just up the quota, seems to be that
+  -quota 3 is about the minimum that works currently)
 *)
 
 module O = Oktree.Make (V3)
@@ -46,16 +47,21 @@ let test_control n =
     |> snd
 
 let main () =
-  let m = 100 in
-  let targets = List.init m (fun _ -> target ()) in
+  let n_targets = 100 in
+  let targets = List.init n_targets (fun _ -> target ()) in
   let make_tests dist =
-    List.map (fun (count, n) ->
-        let pts = List.init n (fun _ -> points dist count) in
+    List.map (fun (pts_per_tree, n_trees, depths) ->
+        let pts = List.init n_trees (fun _ -> points dist pts_per_tree) in
         Bench.Test.create_indexed
-          ~name:(Printf.sprintf "pts:%i n:%i depth" count (n * m))
-          ~args:[2; 3; 4; 5; 6]
+          ~name:(Printf.sprintf "pts:%i n:%i depth" pts_per_tree (n_trees * n_targets))
+          ~args:depths
         @@ test_nearest pts targets;
-      ) [(256, 25); (1024, 25); (65536, 8); (2097152, 1)]
+      ) [
+      (256, 25, [1; 2; 3; 4; 5]);
+      (1024, 25, [2; 3; 4; 5; 6]);
+      (65536, 8, [4; 5; 6]);
+      (2097152, 1, [5; 6; 7]);
+    ]
   in
   (*
     - points in a 'uniform' distribution are completely random, although can
