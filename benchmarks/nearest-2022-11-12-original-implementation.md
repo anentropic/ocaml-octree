@@ -20,7 +20,7 @@ Testing `Oktree.nearest` method.
 
 ## 2022-11-12
 
-(`mWd/Run`, `mjWd/Run` and `Prom/Run` are GC stats)
+(`mWd/Run`, `mjWd/Run` and `Prom/Run` are memory-allocation stats)
 
 | Name                             | Time/Run |  mWd/Run |  mjWd/Run |  Prom/Run | Percentage |
 |----------------------------------|----------|----------|-----------|-----------|------------|

@@ -4,9 +4,12 @@ open Core_bench
 
 (*
   dune build
-  dune exec benchmarks/benchmark.exe
+  dune exec benchmarks/nearest.exe
   or
-  _build/default/benchmarks/benchmark.exe
+  _build/default/benchmarks/nearest.exe
+
+  (if you get "Regression failed ... because the predictors were linearly
+  dependent" when using a low quota try just up the quota, seems to be that)
 *)
 
 module O = Oktree.Make (V3)
@@ -25,19 +28,13 @@ let distance a b = V3.sub a b |> V3.norm
 
 (* TESTS *)
 
-(* points in a 'uniform' distribution
-   ...are completely random, although can look 'clumpy' to the eye*)
-let test_uniform n depth =
-  let tree = O.of_list depth (points Mat.uniform n) in
-  let pt = target () in
-  Core.Staged.stage @@ fun () -> O.nearest tree pt
-
-(* points in a 'normal' distribution
-   ...will be denser in the centre / have more outliers*)
-let test_normal n depth =
-  let tree = O.of_list depth (points Mat.gaussian n) in
-  let pt = target () in
-  Core.Staged.stage @@ fun () -> O.nearest tree pt
+let test_nearest pts targets depth =
+  let trees = List.map (O.of_list depth) pts in
+  Core.Staged.stage @@ (fun () ->
+      List.map (fun tree ->
+          List.map (fun pt -> O.nearest tree pt) targets
+        ) trees
+    )
 
 let test_control n =
   let pt = target () in
@@ -49,23 +46,30 @@ let test_control n =
     |> snd
 
 let main () =
+  let m = 100 in
+  let targets = List.init m (fun _ -> target ()) in
+  let make_tests dist =
+    List.map (fun (count, n) ->
+        let pts = List.init n (fun _ -> points dist count) in
+        Bench.Test.create_indexed
+          ~name:(Printf.sprintf "pts:%i n:%i depth" count (n * m))
+          ~args:[2; 3; 4; 5; 6]
+        @@ test_nearest pts targets;
+      ) [(256, 25); (1024, 25); (65536, 8); (2097152, 1)]
+  in
+  (*
+    - points in a 'uniform' distribution are completely random, although can
+     look 'clumpy' to the eye
+    - 'gaussian' or 'normal' distribution is denser in the middle of the range
+      and has more sparse outliers
+  *)
   ignore @@ Command_unix.run (Bench.make_command [
-      Bench.Test.create_group ~name:"Uniform dist" [
-        Bench.Test.create_indexed ~name:"pts:256 depth" ~args:[4; 5; 6;] @@ test_uniform 256;
-        Bench.Test.create_indexed ~name:"pts:1024 depth" ~args:[4; 5; 6;] @@ test_uniform 1024;
-        Bench.Test.create_indexed ~name:"pts:65536 depth" ~args:[4; 5; 6;] @@ test_uniform 65536;
-        Bench.Test.create_indexed ~name:"pts:2097152 depth" ~args:[4; 5; 6;] @@ test_uniform 2097152;
-      ];
-      Bench.Test.create_group ~name:"Normal dist" [
-        Bench.Test.create_indexed ~name:"pts:256 depth" ~args:[4; 5; 6;] @@ test_normal 256;
-        Bench.Test.create_indexed ~name:"pts:1024 depth" ~args:[4; 5; 6;] @@ test_normal 1024;
-        Bench.Test.create_indexed ~name:"pts:65536 depth" ~args:[4; 5; 6;] @@ test_normal 65536;
-        Bench.Test.create_indexed ~name:"pts:2097152 depth" ~args:[4; 5; 6;] @@ test_uniform 2097152;
-      ];
+      Bench.Test.create_group ~name:"Uniform dist" @@ make_tests Mat.uniform;
+      Bench.Test.create_group ~name:"Normal dist" @@ make_tests Mat.gaussian;
       Bench.Test.create_group ~name:"Control (list cmp + sort)" [
-        Bench.Test.create ~name:"pts:256 depth" @@ test_control 256;
-        Bench.Test.create ~name:"pts:1024 depth" @@ test_control 1024;
-        Bench.Test.create ~name:"pts:65536 depth" @@ test_control 65536;
+        Bench.Test.create ~name:"pts:256" @@ test_control 256;
+        Bench.Test.create ~name:"pts:1024" @@ test_control 1024;
+        (* Bench.Test.create ~name:"pts:65536" @@ test_control 65536; *)
         (* Bench.Test.create ~name:"pts:2097152 depth" @@ test_control 2097152; *)
       ];
     ])

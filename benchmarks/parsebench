@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+# parses the core_bench ascii-art table output from our "nearest" benchmark
+#
+# dependencies:
+# - jc: `pipx install jc` (parse the asciitable to json)
+# - jq: `brew install jq` (process the json, output csv)
+# - csv2md: `pipx install csv2md` (csv -> markdown table)
+#
+# usage:
+#   _build/default/benchmarks/nearest.exe | benchmarks/parsebench
+#   benchmarks/parsebench benchmarks/nearest-2022-11-14-raw.txt
+
+(
+  echo '"Name","Time/run","mWd/run","mjWd/run","Prom/run","Percentage"'
+  cat "${1:-/dev/stdin}" \
+  | tail -n +2 \
+  | jc -p --asciitable \
+  | jq -r '
+    def truncfloat($f):
+      tostring | .[0:$f] | tonumber
+    ;
+    def to_num_and_unit($f):
+      capture("(?<n>[\\d_\\.]+)(?<u>\\w+)")
+      | .n = (.n | gsub("_";"") | tonumber)
+    ;
+    def as_num_and_unit($f; $default; $unit; $mul):
+      if $f then ($f | to_num_and_unit(.)) else {} end
+      | .n = if .n then (.n / $mul) else .n end
+    ;
+    def rpad($len; $fill):
+      tostring
+      | fmax(0; $len - length) as $padby
+      | . + ($fill * $padby)[:$padby]
+    ;
+    def floatdp($len;$dp):
+      tostring
+      | capture("(?<i>.*)\\.(?<d>\\d*)") // {"i":.,"d":""}
+      | .i + "." + (.d[:$dp] | rpad($dp;"0"))
+      | .[:$len]
+    ;
+    def of_num_and_unit($_):
+      if .n then ((.n|tostring|floatdp(8;2)) + .u) else "--" end
+    ;
+    [
+      .[]
+      | .n = (.name | capture(".*\\sn:(?<n>\\d+)\\s.*") // {"n": 1}).n
+      | (if .n then .n|tonumber else 1 end) as $n
+      | .t = as_num_and_unit(.time_run;0;"ns";$n)
+      | .time = (.t | of_num_and_unit(.))
+      | .minor = (as_num_and_unit(.mwd_run;0;"kw";$n) | of_num_and_unit(.))
+      | .major = (as_num_and_unit(.mjwd_run;0;"w";$n) | of_num_and_unit(.))
+      | .prom  = (as_num_and_unit(.prom_run;0;"w";$n) | of_num_and_unit(.))
+      | {"name":.name, "t":.t.n, "time":.time, "minor":.minor, "major":.major, "prom":.prom}
+    ] as $table
+    | ($table | max_by(.t) | .t) as $max_t
+    | $table[]
+    | (.t / $max_t * 100) as $perc
+    | [.name, .time, .minor, .major, .prom, ($perc|floatdp(8;2)) + "%"]
+    | @csv
+  '
+) | csv2md -r 1 2 3 4 5

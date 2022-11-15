@@ -1,0 +1,31 @@
+Estimated testing time 1m18s (26 benchmarks x 3s). Change using '-quota'.
+┌──────────────────────────────────────┬────────────┬────────────┬────────────┬────────────┬────────────┐
+│ Name                                 │   Time/Run │    mWd/Run │   mjWd/Run │   Prom/Run │ Percentage │
+├──────────────────────────────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤
+│ Uniform dist/pts:256 n:100 depth:4   │ 1_718.50us │ 1_304.51kw │  1_179.50w │  1_179.50w │     21.11% │
+│ Uniform dist/pts:256 n:100 depth:5   │ 1_855.22us │ 1_452.39kw │  1_140.50w │  1_140.50w │     22.79% │
+│ Uniform dist/pts:256 n:100 depth:6   │ 1_969.76us │ 1_549.67kw │  1_492.30w │  1_492.30w │     24.20% │
+│ Uniform dist/pts:1024 n:100 depth:4  │ 2_172.49us │ 1_616.55kw │  1_589.00w │  1_589.00w │     26.69% │
+│ Uniform dist/pts:1024 n:100 depth:5  │ 2_448.32us │ 1_817.25kw │  2_047.00w │  2_047.00w │     30.08% │
+│ Uniform dist/pts:1024 n:100 depth:6  │ 2_650.57us │ 1_936.39kw │  2_521.70w │  2_521.70w │     32.56% │
+│ Uniform dist/pts:65536 n:10 depth:4  │   370.11us │   221.88kw │    517.90w │    517.90w │      4.55% │
+│ Uniform dist/pts:65536 n:10 depth:5  │   400.02us │   236.71kw │    417.00w │    417.00w │      4.91% │
+│ Uniform dist/pts:65536 n:10 depth:6  │   463.63us │   278.02kw │    545.00w │    545.00w │      5.70% │
+│ Uniform dist/pts:2097152 n:1 depth:4 │   307.66us │   118.18kw │            │            │      3.78% │
+│ Uniform dist/pts:2097152 n:1 depth:5 │    93.03us │    39.25kw │            │            │      1.14% │
+│ Uniform dist/pts:2097152 n:1 depth:6 │    91.79us │    35.21kw │            │            │      1.13% │
+│ Normal dist/pts:256 n:100 depth:4    │ 4_345.85us │ 2_981.53kw │  4_557.71w │  4_557.71w │     53.39% │
+│ Normal dist/pts:256 n:100 depth:5    │ 5_382.43us │ 3_845.91kw │  5_834.12w │  5_834.12w │     66.13% │
+│ Normal dist/pts:256 n:100 depth:6    │ 6_474.57us │ 4_695.59kw │  7_332.36w │  7_332.36w │     79.55% │
+│ Normal dist/pts:1024 n:100 depth:4   │ 6_474.19us │ 4_134.67kw │ 10_961.61w │ 10_961.61w │     79.54% │
+│ Normal dist/pts:1024 n:100 depth:5   │ 7_002.93us │ 4_800.72kw │ 11_125.50w │ 11_125.50w │     86.04% │
+│ Normal dist/pts:1024 n:100 depth:6   │ 8_139.43us │ 5_465.54kw │ 13_646.63w │ 13_646.63w │    100.00% │
+│ Normal dist/pts:65536 n:10 depth:4   │   260.60us │   183.00kw │    227.89w │    227.89w │      3.20% │
+│ Normal dist/pts:65536 n:10 depth:5   │   293.21us │   203.65kw │    283.71w │    283.71w │      3.60% │
+│ Normal dist/pts:65536 n:10 depth:6   │   315.77us │   216.47kw │    283.51w │    283.51w │      3.88% │
+│ Normal dist/pts:2097152 n:1 depth:4  │    61.70us │    30.41kw │            │            │      0.76% │
+│ Normal dist/pts:2097152 n:1 depth:5  │    67.00us │    36.20kw │            │            │      0.82% │
+│ Normal dist/pts:2097152 n:1 depth:6  │    83.04us │    47.71kw │            │            │      1.02% │
+│ Control (list cmp + sort)/pts:256    │    35.12us │    10.01kw │     72.47w │     72.47w │      0.43% │
+│ Control (list cmp + sort)/pts:1024   │   193.92us │    46.10kw │  1_330.96w │  1_330.96w │      2.38% │
+└──────────────────────────────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘
